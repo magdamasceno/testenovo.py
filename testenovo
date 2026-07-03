@@ -1,0 +1,84 @@
+import streamlit as st
+import numpy as np
+
+# Configuração da página do Streamlit
+st.set_page_config(page_title="Simulador de Metas - Reclame Aqui", page_icon="📊", layout="centered")
+
+st.title("📊 Simulador Inteligente de Metas (Reclame Aqui)")
+st.markdown("""
+Este simulador utiliza **Simulação de Monte Carlo** (10.000 cenários estatísticos) para calcular a probabilidade 
+da sua empresa atingir uma meta de reputação no próximo mês, baseando-se nos seus indicadores atuais.
+""")
+
+st.write("---")
+
+# Criando duas colunas para organizar os inputs manuais
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("📈 Cenário do Próximo Mês")
+    reclamacoes_estimadas = st.number_input("Previsão de novas reclamações no mês:", min_value=1, value=100, step=1)
+    avaliacoes_estimadas = st.number_input("Meta de avaliações a coletar no mês:", min_value=1, value=40, step=1)
+    meta_nota_ra = st.number_input("Nota RA desejada (Meta):", min_value=0.0, max_value=10.0, value=8.0, step=0.1)
+
+with col2:
+    st.subheader("📋 Indicadores Atuais da Empresa")
+    indice_resposta = st.slider("Índice de Resposta (%)", min_value=0.0, max_value=100.0, value=98.0, step=0.1)
+    indice_solucao = st.slider("Índice de Solução (%)", min_value=0.0, max_value=100.0, value=75.0, step=0.1)
+    voltar_negocio = st.slider("Voltar a Fazer Negócio (%)", min_value=0.0, max_value=100.0, value=65.0, step=0.1)
+    nota_consumidor = st.slider("Nota Média do Consumidor (0 a 10)", min_value=0.0, max_value=10.0, value=7.0, step=0.1)
+
+st.write("---")
+
+# O botão que você sugeriu para disparar o cálculo manual
+if st.button("🚀 Calcular Probabilidade de Meta", use_container_width=True):
+    
+    # Rodando a simulação de 10.000 cenários em segundo plano
+    sucessos = 0
+    resultados_ar = []
+    simulacoes = 10000
+    
+    tx_resposta = indice_resposta / 100
+    tx_solucao = indice_solucao / 100
+    tx_voltar = voltar_negocio / 100
+    ir = tx_resposta * 100
+
+    # Progresso visual para o usuário
+    with st.spinner("Analisando 10.000 cenários possíveis..."):
+        for _ in range(simulacoes):
+            # Simulação estatística de variação de humor/comportamento do cliente
+            sim_solucao = np.random.binomial(avaliacoes_estimadas, tx_solucao)
+            is_cenario = (sim_solucao / avaliacoes_estimadas) * 100
+
+            sim_voltar = np.random.binomial(avaliacoes_estimadas, tx_voltar)
+            ivn_cenario = (sim_voltar / avaliacoes_estimadas) * 100
+
+            notas_cenario = np.random.normal(loc=nota_consumidor, scale=1.2, size=avaliacoes_estimadas)
+            notas_cenario = np.clip(notas_cenario, 0, 10)
+            tm_cenario = np.mean(notas_cenario)
+
+            # Fórmula oficial do RA
+            ar_cenario = ((ir * 2) + (ivn_cenario * 3) + (is_cenario * 3) + (tm_cenario * 2)) / 10
+            resultados_ar.append(ar_cenario)
+
+            if ar_cenario >= meta_nota_ra:
+                sucessos += 1
+
+        probabilidade = (sucessos / simulacoes) * 100
+
+    # Exibição dos resultados formatados na tela
+    st.success("### 📊 Resultado da Análise")
+    
+    # Criando métricas visuais bonitas
+    c1, c2, c3 = st.columns(3)
+    c1.metric(label="Probabilidade de Sucesso", value=f"{probabilidade:.2f}%")
+    c2.metric(label="Nota Média Esperada", value=f"{np.mean(resultados_ar):.2f}")
+    c3.metric(label="Margem de Risco (Pior Nota)", value=f"{min(resultados_ar):.2f}")
+
+    # Mensagem de diagnóstico gerencial baseada no resultado
+    if probabilidade > 70:
+        st.info("💡 **Diagnóstico:** Excelente! Seus indicadores atuais dão uma base sólida para atingir essa meta, mesmo que algumas notas negativas entrem no meio do caminho.")
+    elif probabilidade > 40:
+        st.warning("⚠️ **Diagnóstico:** Cenário instável. Você está na trave. Para aumentar suas chances, foque em converter mais avaliações positivas ou melhorar o Índice de Solução em 2% ou 3%.")
+    else:
+        st.error("🚨 **Diagnóstico:** Alerta vermelho. Com o ritmo atual e o volume de reclamações projetado, a matemática está contra você. É altamente recomendável focar em reverter casos antigos antes do fechamento do mês.")
